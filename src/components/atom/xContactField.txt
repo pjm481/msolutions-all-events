@@ -1,0 +1,216 @@
+import {
+  Autocomplete,
+  TextField,
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+} from "@mui/material";
+import React, { useState, useEffect, useRef } from "react";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+
+export default function ContactField({
+  formData,
+  handleInputChange,
+  ZOHO,
+  selectedRowData,
+}) {
+  const [contacts, setContacts] = useState([]); // Contacts fetched from Zoho
+  const [selectedParticipants, setSelectedParticipants] = useState(
+    selectedRowData?.Participants || []
+  ); // Selected values in autocomplete
+  const [inputValue, setInputValue] = useState(""); // Store the input text
+  const [notFoundMessage, setNotFoundMessage] = useState("");
+  const [loading, setLoading] = useState(false); // Loading state for search
+  const [searchType, setSearchType] = useState("First_Name"); // Default search type
+  const debounceTimer = useRef(null); // Ref for debounce timer
+
+  // Sync selectedParticipants with formData.scheduledWith or selectedRowData on mount
+  useEffect(() => {
+    if (formData.scheduledWith && formData.scheduledWith.length > 0) {
+      const initialParticipants = formData.scheduledWith.map((contact) => ({
+        Full_Name: contact.Full_Name || contact.name,
+        Email: contact.Email || "No Email", // Add Email
+        id: contact.participant,
+      }));
+      setSelectedParticipants(initialParticipants);
+    } else if (selectedRowData?.Participants?.length > 0) {
+      const defaultParticipants = selectedRowData.Participants.map((participant) => ({
+        Full_Name: participant.name,
+        Email: participant.email || "No Email", // Add Email
+        id: participant.participant,
+      }));
+      setSelectedParticipants(defaultParticipants);
+    }
+  }, [formData.scheduledWith, selectedRowData]);
+  
+
+  const handleSearch = async (query) => {
+    setNotFoundMessage(""); // Reset the message
+    setLoading(true); // Start loading
+
+    if (ZOHO && query.trim()) {
+      try {
+        let searchResults;
+
+        if (searchType === "Email") {
+          // Email-specific search
+          searchResults = await ZOHO.CRM.API.searchRecord({
+            Entity: "Contacts",
+            Type: "email",
+            Query: query.trim(),
+          });
+        } else {
+          // Criteria-based search for other fields
+          const searchTypeField = searchType; // Matches "First_Name" or "Last_Name"
+          searchResults = await ZOHO.CRM.API.searchRecord({
+            Entity: "Contacts",
+            Type: "criteria",
+            Query: `(${searchTypeField}:equals:${query.trim()})`,
+          });
+        }
+
+        if (searchResults.data && searchResults.data.length > 0) {
+          // Log raw results for debugging
+          console.log("Raw Search Results:", searchResults.data);
+
+          const formattedContacts = searchResults.data.map((contact) => ({
+            Full_Name:
+              contact.Full_Name ||
+              `${contact.First_Name || ""} ${contact.Last_Name || ""}`.trim(),
+            First_Name: contact.First_Name || "",
+            Last_Name: contact.Last_Name || "",
+            Email: contact.Email || "No Email", // Fallback to "No Email" if undefined
+            id: contact.id,
+          }));
+
+          console.log("Formatted Contacts:", formattedContacts);
+
+          // No filtering required since we're searching directly for the email
+          setContacts(formattedContacts);
+          setNotFoundMessage("");
+        } else {
+          setNotFoundMessage(`"${query}" not found in the database`);
+          setContacts([]); // Clear contacts to avoid stale options
+        }
+      } catch (error) {
+        console.error("Error during search:", error);
+        setNotFoundMessage(
+          "An error occurred while searching. Please try again."
+        );
+      } finally {
+        setLoading(false); // End loading
+      }
+    } else {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChangeWithDebounce = (event, newInputValue) => {
+    setInputValue(newInputValue);
+    setNotFoundMessage(""); // Clear the "Not found" message when user types again
+
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current); // Clear the previous timer
+    }
+
+    debounceTimer.current = setTimeout(() => {
+      if (newInputValue.trim()) {
+        handleSearch(newInputValue);
+      }
+    }, 500); // 2-second debounce delay
+  };
+
+  const handleSelectionChange = (event, newValue) => {
+    // Merge selected values with their full objects from contacts
+    const updatedParticipants = newValue.map((selected) => {
+      const fullContact = contacts.find((contact) => contact.id === selected.id);
+      return {
+        Full_Name: selected.Full_Name,
+        Email: fullContact?.Email || "No Email", // Ensure Email is included
+        id: selected.id,
+      };
+    });
+  
+    setSelectedParticipants(updatedParticipants);
+  
+    // Pass the updated data to handleInputChange
+    handleInputChange(
+      "scheduledWith",
+      updatedParticipants.map((contact) => ({
+        Full_Name: contact.Full_Name,
+        Email: contact.Email,
+        participant: contact.id,
+        type: "contact",
+      }))
+    );
+  };
+  
+
+
+  console.log({selectedParticipants})
+
+  return (
+    <Box display="flex" alignItems="flex-start" gap={1} sx={{ width: "100%" }}>
+      <Select
+        value={searchType}
+        onChange={(e) => setSearchType(e.target.value)}
+        displayEmpty
+        variant="outlined"
+        sx={{
+          height: 57, // Match the height of the Autocomplete component
+          width: 140,
+          alignSelf: "flex-start", // Ensure alignment at the top
+        }}
+      >
+        <MenuItem value="First_Name">First Name</MenuItem>
+        <MenuItem value="Last_Name">Last Name</MenuItem>
+        <MenuItem value="Email">Email</MenuItem>
+      </Select>
+      <Autocomplete
+        multiple
+        fullWidth
+        options={contacts}
+        getOptionLabel={(option) => {
+          // Handle both dropdown options and selected values
+          const email = option.Email || "No Email";
+          const fullName = option.Full_Name || "No Name";
+          return searchType === "Email" ? `${email} (${fullName})` : fullName;
+        }}
+        value={selectedParticipants}
+        onChange={handleSelectionChange}
+        inputValue={inputValue}
+        onInputChange={handleInputChangeWithDebounce}
+        loading={loading}
+        noOptionsText={
+          notFoundMessage ? (
+            <Box display="flex" alignItems="center" color="error.main">
+              <ErrorOutlineIcon sx={{ mr: 1 }} />
+              <Typography variant="body2">{notFoundMessage}</Typography>
+            </Box>
+          ) : (
+            "No options"
+          )
+        }
+        sx={{
+          "& .MuiAutocomplete-tag": {
+            maxHeight: "80px", // Set max height for tags container
+            overflowY: "auto", // Enable scroll for overflowing tags
+          },
+          "& .MuiAutocomplete-inputRoot": {
+            alignItems: "flex-start", // Align the input box at the top
+          },
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            fullWidth
+            variant="outlined"
+            label="Scheduled with"
+            placeholder="Type to search..."
+          />
+        )}
+      />
+    </Box>
+  );
+}
