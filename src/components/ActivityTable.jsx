@@ -89,7 +89,7 @@ const headCells = [
 
 const noSort = ["duration", "time"];
 
-const convertDate = (date)=>{
+const convertDate = (date) => {
   const [day, month, year] = date.split("/");
   return `${year}-${month}-${day}`;
 }
@@ -102,7 +102,7 @@ function descendingComparator(a, b, orderBy) {
   if (orderBy === "date") {
     const newB = new Date(convertDate(b[orderBy]));
     const newA = new Date(convertDate(a[orderBy]));
-    
+
     if (newB < newA) {
       return -1;
     }
@@ -163,8 +163,8 @@ const CustomTableCell = ({
           highlightedRow === row.id
             ? "#FFFFFF"
             : selectedRowIndex === row.id
-            ? "#FFFFFF"
-            : row?.color || "black",
+              ? "#FFFFFF"
+              : row?.color || "black",
         fontSize: "9pt",
         p: ".2rem",
       }}
@@ -195,8 +195,8 @@ function createData(event, type) {
   const duration = event.Duration_Min
     ? `${event.Duration_Min} minutes`
     : parsedStart?.isValid() && parsedEnd?.isValid()
-    ? `${parsedEnd.diff(parsedStart, "minute")} minutes`
-    : "-";
+      ? `${parsedEnd.diff(parsedStart, "minute")} minutes`
+      : "-";
 
   const scheduledFor =
     event.Owner?.name || event.scheduleFor?.full_name || "Unknown";
@@ -334,7 +334,7 @@ export default function ScheduleTable({
   const loading = useEventsStore((state) => state.loading);
   const cache = useEventsStore((state) => state.cache);
   const { updateEvent, addEvent, removeEvent } = useEventsStore();
-  
+
   // Wrapper for updateEventState that uses the store
   const handleUpdateEventState = React.useCallback((updatedEvent) => {
     // Update global store
@@ -344,6 +344,14 @@ export default function ScheduleTable({
       updateEventState(updatedEvent);
     }
   }, [updateEvent, updateEventState]);
+
+  const isAdmin = React.useMemo(() => {
+    return (
+      loggedInUser?.User_Type === "Admin" ||
+      loggedInUser?.User_Type === "Super Admin"
+    );
+  }, [loggedInUser]);
+
   const [selectedRowIndex, setSelectedRowIndex] = React.useState(null);
   const [highlightedRow, setHighlightedRow] = React.useState(null);
   const [openClearModal, setOpenClearModal] = React.useState(false);
@@ -354,9 +362,18 @@ export default function ScheduleTable({
 
   const [filterType, setFilterType] = React.useState([]);
   const [filterPriority, setFilterPriority] = React.useState([]);
-  const [filterUser, setFilterUser] = React.useState(
-    loggedInUser?.full_name ? [loggedInUser.full_name] : []
-  );
+  const [filterUser, setFilterUser] = React.useState([]);
+
+  // Set initial filter based on user type when loggedInUser data is ready
+  React.useEffect(() => {
+    if (loggedInUser) {
+      if (loggedInUser.User_Type === "Generic") {
+        setFilterUser([loggedInUser.full_name]);
+      } else {
+        setFilterUser([]); // Admin or Super Admin
+      }
+    }
+  }, [loggedInUser]);
 
   const [showCleared, setShowCleared] = React.useState(false); // State for "Cleared" checkbox
 
@@ -437,15 +454,15 @@ export default function ScheduleTable({
     // Step 1: Reset all filter states
     setFilterType([]);
     setFilterPriority([]);
-    // Reset user filter to logged-in user only (default state)
-    setFilterUser(loggedInUser?.full_name ? [loggedInUser.full_name] : []);
+    // Reset user filter: empty for Admin, logged-in user for others
+    setFilterUser(isAdmin ? [] : (loggedInUser?.full_name ? [loggedInUser.full_name] : []));
     setCustomDateRange(null);
     setShowCleared(false); // Reset "Show Cleared" checkbox
-    
+
     // Step 2: Check cache for "Default" key and restore data immediately
     const store = useEventsStore.getState();
     const defaultCache = store.getCache("Default");
-    
+
     if (defaultCache && defaultCache.data && defaultCache.data.length > 0) {
       // Cache exists - immediately restore events from cache
       console.log('✅ Restoring events from cache["Default"]:', defaultCache.data.length, 'events');
@@ -454,7 +471,7 @@ export default function ScheduleTable({
       // Cache is empty - will trigger network fetch via useEffect when filterDate changes
       console.log('⚠️ No cache found for "Default", will trigger network fetch');
     }
-    
+
     // Step 3: Reset filterDate to "Default" (this triggers useEffect in App.jsx if cache was empty)
     setFilterDate("Default");
   };
@@ -464,8 +481,8 @@ export default function ScheduleTable({
   const rows = React.useMemo(() => {
     return Array.isArray(events)
       ? events.map((event) =>
-          createData(event, event.Type_of_Activity || "Other")
-        )
+        createData(event, event.Type_of_Activity || "Other")
+      )
       : [];
   }, [events]);
 
@@ -479,7 +496,7 @@ export default function ScheduleTable({
       console.log("🔍 Custom date range filter active:", customDateRange);
       console.log("📊 Total rows to filter:", rows.length);
     }
-    
+
     const filtered = rows.filter((row) => {
       // Type filter
       const typeMatch =
@@ -513,13 +530,13 @@ export default function ScheduleTable({
         // e.g., "06/01/2026" = January 6, 2026 (not June 1st)
         // Use startOf("day") to normalize to midnight for accurate date-only comparison
         let rowDate = dayjs(row.date, "DD/MM/YYYY").startOf("day");
-        
+
         // Fallback: if DD/MM/YYYY parsing fails, try other formats
         if (!rowDate.isValid()) {
           // Try ISO format as fallback
           rowDate = dayjs(row.date, "YYYY-MM-DD").startOf("day");
         }
-        
+
         // HTML5 date input (type="date") always returns ISO format (YYYY-MM-DD)
         // Parse explicitly to avoid any locale-dependent parsing issues
         // Use startOf("day") to normalize to midnight for accurate date-only comparison
@@ -564,12 +581,12 @@ export default function ScheduleTable({
 
       return result;
     });
-    
+
     // Debug: Log filtering results
     if (customDateRange) {
       console.log(`📈 Filter results: ${filtered.length} rows passed filter out of ${rows.length} total rows`);
     }
-    
+
     return filtered;
   }, [
     rows,
@@ -582,40 +599,40 @@ export default function ScheduleTable({
     order,
     orderBy,
   ]);
-  console.log({date:rows?.map(el=>el?.date),date2:filteredRows?.map(el=>el?.date)})
+  console.log({ date: rows?.map(el => el?.date), date2: filteredRows?.map(el => el?.date) })
 
   // Generate active filter names for summary display
   const getActiveFilterNames = () => {
     const activeFilters = [];
-    
+
     // Date filter - show if Custom Range is set or if filterDate is not Default
     if (customDateRange) {
       activeFilters.push("Date");
     } else if (filterDate && filterDate !== "Default") {
       activeFilters.push("Date");
     }
-    
+
     // Type filter - show if any types are selected
     if (filterType.length > 0) {
       activeFilters.push("Type");
     }
-    
+
     // Priority filter - show if any priorities are selected
     if (filterPriority.length > 0) {
       activeFilters.push("Priority");
     }
-    
+
     // User filter - show if filtering to a subset of users (not all users)
     // This means if filterUser.length < users.length, it's an active filter
     if (filterUser.length > 0 && filterUser.length < users.length) {
       activeFilters.push("User");
     }
-    
+
     // Cleared filter - show if "Show Cleared" checkbox is checked
     if (showCleared) {
       activeFilters.push("Cleared");
     }
-    
+
     return activeFilters;
   };
 
@@ -926,6 +943,7 @@ export default function ScheduleTable({
           Clear filter
         </Button>
 
+
         <FormControlLabel
           control={
             <Checkbox
@@ -1036,7 +1054,7 @@ export default function ScheduleTable({
                       <TableSortLabel
                         active={orderBy === el.id}
                         direction={orderBy === el.id ? order : "asc"}
-                        // onClick={createSortHandler(headCell.id)}
+                      // onClick={createSortHandler(headCell.id)}
                       >
                         {el.label}
                         {orderBy === el.id ? (
@@ -1068,14 +1086,14 @@ export default function ScheduleTable({
                     sx={{
                       backgroundColor:
                         highlightedRow === row.id ||
-                        (selectedRowIndex === row.id && openClearModal)
+                          (selectedRowIndex === row.id && openClearModal)
                           ? "#0072DC"
                           : index % 2 === 0
-                          ? "white"
-                          : "#efefef",
+                            ? "white"
+                            : "#efefef",
                       color:
                         highlightedRow === row.id ||
-                        (selectedRowIndex === row.id && openClearModal)
+                          (selectedRowIndex === row.id && openClearModal)
                           ? "#FFFFFF"
                           : "black",
                       position: "relative",
@@ -1128,7 +1146,7 @@ export default function ScheduleTable({
                       row={row}
                       highlightedRow={highlightedRow}
                     >
-                      
+
                       {row.date}
                     </CustomTableCell>
                     <CustomTableCell
@@ -1158,25 +1176,25 @@ export default function ScheduleTable({
                     <TableCell sx={{ fontSize: "9pt", py: 0 }}>
                       {row.participants.length > 0
                         ? row.participants.map((participant, i) => (
-                            <React.Fragment key={i}>
-                              <a
-                                href={`https://crm.zoho.com.au/crm/org7004396182/tab/Contacts/${participant.participant}/canvas/76775000000287551`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  color:
-                                    selectedRowIndex === row.id
-                                      ? "#fff"
-                                      : "#0072DC",
-                                  textDecoration: "underline",
-                                  fontSize: "9pt",
-                                }}
-                              >
-                                {participant.name || participant.Full_Name}
-                              </a>
-                              {i < row.participants.length - 1 && ", "}
-                            </React.Fragment>
-                          ))
+                          <React.Fragment key={i}>
+                            <a
+                              href={`https://crm.zoho.com.au/crm/org7004396182/tab/Contacts/${participant.participant}/canvas/76775000000287551`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color:
+                                  selectedRowIndex === row.id
+                                    ? "#fff"
+                                    : "#0072DC",
+                                textDecoration: "underline",
+                                fontSize: "9pt",
+                              }}
+                            >
+                              {participant.name || participant.Full_Name}
+                            </a>
+                            {i < row.participants.length - 1 && ", "}
+                          </React.Fragment>
+                        ))
                         : "No Participants"}
                     </TableCell>
                     <CustomTableCell
@@ -1252,6 +1270,7 @@ export default function ScheduleTable({
         handleClose={handleClose}
         setCustomDateRange={setCustomDateRange}
       />
+
     </>
   );
 }

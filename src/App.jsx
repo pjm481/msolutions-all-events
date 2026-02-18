@@ -11,24 +11,24 @@ export const ZohoContext = createContext();
 
 function App() {
   // --- Global State Management (Zustand) ---
-  const { 
-    events, 
-    setEvents, 
+  const {
+    events,
+    setEvents,
     addEvents,
-    loading, 
+    loading,
     setLoading,
     cache,
     setCache,
     getCache,
     updateCacheEntry
   } = useEventsStore();
-  
+
   // --- Local State Management ---
   const [zohoLoaded, setZohoLoaded] = useState(false);
   const [users, setUsers] = useState([]);
   const [recentColors, setRecentColor] = useState("");
   const [loggedInUser, setLoggedInUser] = useState(null);
-  
+
   // Filter States
   const [filterDate, setFilterDate] = useState("Default");
   const [customDateRange, setCustomDateRange] = useState(null);
@@ -39,7 +39,21 @@ function App() {
     ZOHO.embeddedApp.init().then(() => {
       setZohoLoaded(true);
       ZOHO.CRM.CONFIG.getCurrentUser().then((data) => {
-        setLoggedInUser(data?.users[0]);
+        if (data?.users?.[0]?.id) {
+          ZOHO.CRM.API.getRecord({
+            Entity: "users",
+            approved: "both",
+            RecordID: data.users[0].id,
+          }).then((userData) => {
+            const user = userData?.users?.[0];
+            if (user) {
+              setLoggedInUser(user);
+            } else {
+              // Fallback to basic data if getRecord fails or returns nothing
+              setLoggedInUser(data.users[0]);
+            }
+          });
+        }
       });
     });
   }, []);
@@ -92,47 +106,47 @@ function App() {
       case "Current Week":
         beginDate = new Date(currentDate);
         beginDate.setDate(currentDate.getDate() - currentDate.getDay());
-        beginDate.setHours(0,0,0,0);
-        
+        beginDate.setHours(0, 0, 0, 0);
+
         closeDate = new Date(beginDate);
         closeDate.setDate(beginDate.getDate() + 6);
-        closeDate.setHours(23,59,59,999);
+        closeDate.setHours(23, 59, 59, 999);
         break;
       case "Last 7 Days":
         closeDate = new Date();
         beginDate = new Date();
         beginDate.setDate(closeDate.getDate() - 6); // inclusive of today
-        beginDate.setHours(0,0,0,0);
+        beginDate.setHours(0, 0, 0, 0);
         break;
       case "Last 30 Days":
         closeDate = new Date();
         beginDate = new Date();
         beginDate.setDate(closeDate.getDate() - 29);
-        beginDate.setHours(0,0,0,0);
+        beginDate.setHours(0, 0, 0, 0);
         break;
       case "Last 90 Days":
         closeDate = new Date();
         beginDate = new Date();
         beginDate.setDate(closeDate.getDate() - 89);
-        beginDate.setHours(0,0,0,0);
+        beginDate.setHours(0, 0, 0, 0);
         break;
       case "Last Month":
         beginDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
         closeDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
-        closeDate.setHours(23,59,59,999);
+        closeDate.setHours(23, 59, 59, 999);
         break;
       case "Current Month":
         beginDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         closeDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        closeDate.setHours(23,59,59,999);
+        closeDate.setHours(23, 59, 59, 999);
         break;
       case "Next Week":
         beginDate = new Date();
         beginDate.setDate(beginDate.getDate() - beginDate.getDay() + 7);
-        beginDate.setHours(0,0,0,0);
+        beginDate.setHours(0, 0, 0, 0);
         closeDate = new Date(beginDate);
         closeDate.setDate(beginDate.getDate() + 6);
-        closeDate.setHours(23,59,59,999);
+        closeDate.setHours(23, 59, 59, 999);
         break;
       case "Custom Range":
         if (customRange) {
@@ -149,17 +163,17 @@ function App() {
   const formatDateForZoho = (date, hours = 0, minutes = 0, seconds = 0) => {
     if (!date || isNaN(date.getTime())) return null;
     const pad = (num) => String(num).padStart(2, "0");
-    
+
     const year = date.getFullYear();
     const month = pad(date.getMonth() + 1);
     const day = pad(date.getDate());
     const formattedTime = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-    
+
     const timezoneOffset = -date.getTimezoneOffset();
     const offsetSign = timezoneOffset >= 0 ? "+" : "-";
     const offsetHours = pad(Math.floor(Math.abs(timezoneOffset) / 60));
     const offsetMinutes = pad(Math.abs(timezoneOffset) % 60);
-    
+
     return `${year}-${month}-${day}T${formattedTime}${offsetSign}${offsetHours}:${offsetMinutes}`;
   };
 
@@ -178,13 +192,13 @@ function App() {
    */
   const updateEventState = (updatedEvent) => {
     const store = useEventsStore.getState();
-    
+
     // Step 1: Update global store master list (ALWAYS - this is the source of truth)
     store.updateEvent(updatedEvent);
-    
+
     // Step 2: Update all cache entries (ALWAYS - ensures cache stays fresh)
     store.updateCacheEntry(updatedEvent);
-    
+
     // Step 3: Re-validate if the event still matches the current filter's date range
     const eventDate = new Date(updatedEvent.Start_DateTime);
     if (isNaN(eventDate.getTime())) {
@@ -192,7 +206,7 @@ function App() {
       // Still update the store and cache, just skip re-validation
       return;
     }
-    
+
     // Calculate the current filter's date range
     let currentRange = null;
     if (filterDate === "Custom Range" && customDateRange) {
@@ -203,22 +217,22 @@ function App() {
       // Default filter - check against its range (last month to 1 year future)
       currentRange = calculateDateRange("Default");
     }
-    
+
     if (!currentRange || !currentRange.beginDate || !currentRange.closeDate) {
       console.warn('⚠️ Could not calculate current filter range, keeping event in view');
       // If we can't determine the range, keep the event visible
       return;
     }
-    
+
     // Step 4: Check if event's date falls within current filter range
-    const eventFitsInRange = 
-      eventDate >= currentRange.beginDate && 
+    const eventFitsInRange =
+      eventDate >= currentRange.beginDate &&
       eventDate <= currentRange.closeDate;
-    
+
     // Step 5: Handle visibility based on filter match
     const currentEvents = store.events;
     const eventExists = currentEvents.some(e => e.id === updatedEvent.id);
-    
+
     if (eventFitsInRange) {
       // Event still matches filter - ensure it's in the master list
       // (It's already updated via updateEvent, but we ensure it exists)
@@ -252,7 +266,7 @@ function App() {
 
     while (hasMoreRecords && currentPage < 11) {
       const searchUrl = `((Start_DateTime:greater_equal:${encodeURIComponent(formattedBegin)})and(End_DateTime:less_equal:${encodeURIComponent(formattedClose)}))`;
-      
+
       const req_data = {
         url: `https://www.zohoapis.com.au/crm/v3/Events/search?criteria=${searchUrl}&per_page=${recordsPerPage}&page=${currentPage}`,
         method: "GET",
@@ -288,17 +302,17 @@ function App() {
   };
 
   // --- 6. Intelligent Caching Logic ---
-  
+
   // This checks if we already have a "superset" of data that covers the needed range
   const findCachedSubset = (neededStart, neededEnd) => {
     // Get current cache from store
     const currentCache = useEventsStore.getState().cache;
     const cacheKeys = Object.keys(currentCache);
-    
+
     for (const key of cacheKeys) {
       const cachedItem = currentCache[key];
       if (!cachedItem || !cachedItem.range) continue;
-      
+
       const cachedStart = cachedItem.range.start;
       const cachedEnd = cachedItem.range.end;
 
@@ -306,7 +320,7 @@ function App() {
       // We use a small buffer (1000ms) to handle slight time diffs
       if (cachedStart <= neededStart && cachedEnd >= neededEnd) {
         console.log(`Optimization: Found data in cache [${key}] for requested range.`);
-        
+
         // Filter the cached data to return ONLY what fits the needed range
         return cachedItem.data.filter(event => {
           const eDate = new Date(event.Start_DateTime);
@@ -349,7 +363,7 @@ function App() {
 
       // Add to global store (merges with existing, deduplicates)
       addEvents(processedData);
-      
+
       // Save to cache with metadata about the Date Range
       setCache(filterType, processedData, { start: dates.beginDate, end: dates.closeDate });
     } catch (error) {
@@ -406,7 +420,7 @@ function App() {
         recentColors,
         setRecentColor,
         // Expose the updater so child components can fix state without refetching
-        updateEventState, 
+        updateEventState,
       }}
     >
       {loading ? (
