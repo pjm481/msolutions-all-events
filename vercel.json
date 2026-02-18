@@ -1,3 +1,5 @@
 {
-  "installCommand": "npm ci"
+  "installCommand": "npm install -g pnpm && pnpm install",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist"
 }
