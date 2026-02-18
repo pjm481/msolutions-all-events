@@ -1,5 +1,5 @@
 {
-  "installCommand": "corepack enable && corepack prepare pnpm@10.23.0 --activate && pnpm install --frozen-lockfile",
+  "installCommand": "npm install -g pnpm@10.23.0 && pnpm install",
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist"
 }
