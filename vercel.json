@@ -1,5 +1,6 @@
 {
-  "installCommand": "npm install -g pnpm@10.23.0 && pnpm install",
+  "installCommand": "npm install -g pnpm@9 && pnpm install",
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist"
+
 }
