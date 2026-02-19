@@ -103,6 +103,12 @@ function App() {
         beginDate = new Date("2023-01-01");
         closeDate = new Date();
         break;
+      case "Today":
+        beginDate = new Date(currentDate);
+        beginDate.setHours(0, 0, 0, 0);
+        closeDate = new Date(currentDate);
+        closeDate.setHours(23, 59, 59, 999);
+        break;
       case "Current Week":
         beginDate = new Date(currentDate);
         beginDate.setDate(currentDate.getDate() - currentDate.getDay());

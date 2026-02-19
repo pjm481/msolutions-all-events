@@ -46,6 +46,10 @@ export const isDateInRange = (date, rangeType) => {
   let startDate, endDate;
 
   switch (rangeType) {
+    case "Today":
+      startDate = today.valueOf();
+      endDate = today.endOf("day").valueOf();
+      break;
     case "Current Week":
       startDate = today.startOf("week").valueOf();
       endDate = today.startOf("week").add(6, "day").endOf("day").valueOf();

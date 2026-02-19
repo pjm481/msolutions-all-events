@@ -382,6 +382,7 @@ export default function ScheduleTable({
 
   const filterDateOptions = [
     { label: "Default", value: "Default" },
+    { label: "Today", value: "Today" },
     { label: "Last 7 Days", value: "Last 7 Days" },
     { label: "Last 30 Days", value: "Last 30 Days" },
     { label: "Last 90 Days", value: "Last 90 Days" },
